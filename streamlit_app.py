@@ -14,13 +14,16 @@ st.title("ORCA Strategic OS")
 st.write("Sistema de inteligencia estratégica automatizada")
 
 # ==============================
-# API KEY
+# API KEY SEGURA (CORRECTO)
 # ==============================
 
-GEMINI_API_KEY = st.secrets.get("GEMINI_API_KEY", None)
+try:
+    GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
+except:
+    GEMINI_API_KEY = None
 
 if not GEMINI_API_KEY:
-    st.error("Falta GEMINI_API_KEY en secrets.toml")
+    st.error("API Key no configurada en Streamlit Secrets")
 
 # ==============================
 # UI STYLE
@@ -28,30 +31,34 @@ if not GEMINI_API_KEY:
 
 st.markdown("""
 <style>
-body { background-color:#0e1117; color:white; }
+body {
+    background-color: #0e1117;
+    color: white;
+}
 .stTextArea textarea, .stTextInput input {
-    background-color:#1c1f26; color:white;
+    background-color: #1c1f26;
+    color: white;
 }
 .stButton>button {
     background: linear-gradient(90deg,#00c6ff,#0072ff);
-    color:white;
-    font-weight:600;
+    color: white;
+    font-weight: 600;
 }
 </style>
 """, unsafe_allow_html=True)
 
 # ==============================
-# GEMINI API (VERSION ROBUSTA REAL)
+# GEMINI API (ROBUSTO + SEGURO)
 # ==============================
 
 def call_gemini(prompt):
 
     if not GEMINI_API_KEY:
-        return "Error: API Key no configurada"
+        return "Error: API Key no disponible"
 
     models = [
-        "gemini-1.5-flash",
-        "gemini-1.5-pro"
+        "gemini-1.0-pro",
+        "gemini-1.5-flash"
     ]
 
     last_error = None
@@ -67,24 +74,21 @@ def call_gemini(prompt):
 
         payload = {
             "contents": [
-                {
-                    "parts": [{"text": prompt}]
-                }
+                {"parts": [{"text": prompt}]}
             ]
         }
 
         try:
             r = requests.post(url, headers=headers, json=payload, timeout=30)
 
-            # 🔍 DEBUG REAL
             if r.status_code != 200:
-                last_error = f"{model} -> {r.status_code}: {r.text}"
+                last_error = r.text
                 continue
 
             data = r.json()
 
             if "candidates" not in data:
-                last_error = f"{model} -> respuesta inválida"
+                last_error = "Respuesta inválida"
                 continue
 
             return data["candidates"][0]["content"]["parts"][0]["text"]
@@ -124,39 +128,22 @@ def scrape(url):
 def build_prompt(data, location):
 
     return f"""
-Eres ORCA Strategic OS (equipo de consultoría elite).
+Eres ORCA Strategic OS (consultoría tipo McKinsey + Silicon Valley).
 
-Analiza estos datos:
-
+Datos:
 {json.dumps(data, indent=2)}
 
 Ubicación: {location}
 
-Genera:
+Entrega:
 
 1. ESTADÍSTICAS
-- engagement
-- salud de marca
+2. MARKETING (AIDA + estrategia local)
+3. DISEÑO (luxury editorial)
+4. CONTENIDO (7 días + hooks)
+5. NEGOCIO (viabilidad + optimización)
 
-2. MARKETING
-- funnel AIDA
-- estrategia local
-
-3. DISEÑO
-- estilo luxury editorial
-- colores HEX
-- tipografías
-
-4. CONTENIDO
-- 7 días
-- hooks virales
-- guiones técnicos
-
-5. NEGOCIO
-- viabilidad
-- optimización
-
-Sé preciso, directo y accionable.
+Sé claro, estratégico y accionable.
 """
 
 # ==============================
@@ -167,14 +154,14 @@ urls_input = st.text_area("URLs (una por línea)")
 location = st.text_input("Ubicación", "Quito, Ecuador")
 
 # ==============================
-# TEST GEMINI (DEBUG TOOL)
+# TEST GEMINI
 # ==============================
 
 if st.button("TEST GEMINI"):
     st.write(call_gemini("Responde solo OK"))
 
 # ==============================
-# RUN
+# EJECUCIÓN
 # ==============================
 
 if st.button("Ejecutar análisis"):
@@ -185,9 +172,10 @@ if st.button("Ejecutar análisis"):
 
         urls = urls_input.split("\n")
 
-        st.write("Procesando scraping...")
+        st.write("Procesando datos...")
 
         data = []
+
         for u in urls:
             u = u.strip()
             if u:
@@ -206,8 +194,8 @@ if st.button("Ejecutar análisis"):
             st.json(data)
 
 # ==============================
-# DEBUG PANEL
+# DEBUG
 # ==============================
 
 with st.expander("Debug"):
-    st.write("API KEY cargada:", bool(GEMINI_API_KEY))
+    st.write("API Key cargada:", bool(GEMINI_API_KEY))
