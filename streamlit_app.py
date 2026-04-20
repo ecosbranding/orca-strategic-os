@@ -4,21 +4,14 @@ import json
 import random
 from urllib.parse import urlparse
 
-from database import init_db, save_analysis, get_history
-
-# ==============================
-# INIT DB
-# ==============================
-
-init_db()
-
 # ==============================
 # CONFIG
 # ==============================
 
-st.set_page_config(page_title="ORCA SaaS", layout="wide")
+st.set_page_config(page_title="ORCA Strategic OS", layout="wide")
 
-st.title("ORCA Strategic OS - SaaS")
+st.title("ORCA Strategic OS")
+st.write("Sistema de inteligencia estratégica automatizada")
 
 # ==============================
 # API KEY
@@ -26,46 +19,45 @@ st.title("ORCA Strategic OS - SaaS")
 
 GEMINI_API_KEY = st.secrets.get("GEMINI_API_KEY", None)
 
-# ==============================
-# LOGIN SIMPLE (MVP)
-# ==============================
-
-if "user" not in st.session_state:
-    st.session_state.user = None
-
-if not st.session_state.user:
-    st.subheader("Login")
-
-    user = st.text_input("Usuario")
-    if st.button("Entrar"):
-        if user:
-            st.session_state.user = user
-            st.rerun()
-
-    st.stop()
+if not GEMINI_API_KEY:
+    st.error("Falta GEMINI_API_KEY en secrets.toml")
 
 # ==============================
-# LOGGED IN
+# UI STYLE
 # ==============================
 
-st.sidebar.write(f"Usuario: {st.session_state.user}")
-
-if st.sidebar.button("Logout"):
-    st.session_state.user = None
-    st.rerun()
+st.markdown("""
+<style>
+body { background-color:#0e1117; color:white; }
+.stTextArea textarea, .stTextInput input {
+    background-color:#1c1f26; color:white;
+}
+.stButton>button {
+    background: linear-gradient(90deg,#00c6ff,#0072ff);
+    color:white;
+    font-weight:600;
+}
+</style>
+""", unsafe_allow_html=True)
 
 # ==============================
-# GEMINI
+# GEMINI API (VERSION ROBUSTA REAL)
 # ==============================
 
 def call_gemini(prompt):
 
     if not GEMINI_API_KEY:
-        return "Error: API Key faltante"
+        return "Error: API Key no configurada"
 
-    models = ["gemini-1.5-pro", "gemini-1.5-flash"]
+    models = [
+        "gemini-1.5-flash",
+        "gemini-1.5-pro"
+    ]
+
+    last_error = None
 
     for model in models:
+
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
 
         headers = {
@@ -74,93 +66,148 @@ def call_gemini(prompt):
         }
 
         payload = {
-            "contents": [{"parts": [{"text": prompt}]}]
+            "contents": [
+                {
+                    "parts": [{"text": prompt}]
+                }
+            ]
         }
 
         try:
             r = requests.post(url, headers=headers, json=payload, timeout=30)
 
-            if r.status_code == 200:
-                return r.json()["candidates"][0]["content"]["parts"][0]["text"]
+            # 🔍 DEBUG REAL
+            if r.status_code != 200:
+                last_error = f"{model} -> {r.status_code}: {r.text}"
+                continue
 
-        except:
+            data = r.json()
+
+            if "candidates" not in data:
+                last_error = f"{model} -> respuesta inválida"
+                continue
+
+            return data["candidates"][0]["content"]["parts"][0]["text"]
+
+        except Exception as e:
+            last_error = str(e)
             continue
 
-    return "Error Gemini"
+    return f"Error Gemini: {last_error}"
 
 # ==============================
 # SCRAPING SIMULADO
 # ==============================
 
 def scrape(url):
+
     domain = urlparse(url).netloc
 
     return {
         "url": url,
-        "platform": "Instagram" if "instagram" in domain else "TikTok" if "tiktok" in domain else "Web",
+        "platform": (
+            "Instagram" if "instagram" in domain
+            else "TikTok" if "tiktok" in domain
+            else "Web"
+        ),
         "followers": random.randint(1000, 90000),
-        "engagement": round(random.uniform(1, 9), 2)
+        "engagement_rate": round(random.uniform(1, 9), 2),
+        "content_type": random.choice(["Reels", "Educativo", "Ventas", "Lifestyle"]),
+        "posting_frequency": random.choice(["Alta", "Media", "Baja"]),
+        "brand_tone": random.choice(["Premium", "Casual", "Corporativo"])
     }
 
 # ==============================
-# PROMPT
+# PROMPT ORCA
 # ==============================
 
 def build_prompt(data, location):
-    return f"""
-Eres ORCA SaaS Analyst.
 
-Datos:
+    return f"""
+Eres ORCA Strategic OS (equipo de consultoría elite).
+
+Analiza estos datos:
+
 {json.dumps(data, indent=2)}
 
 Ubicación: {location}
 
-Entrega:
-- Marketing
-- Estrategia
-- Contenido 7 días
-- Optimización negocio
+Genera:
+
+1. ESTADÍSTICAS
+- engagement
+- salud de marca
+
+2. MARKETING
+- funnel AIDA
+- estrategia local
+
+3. DISEÑO
+- estilo luxury editorial
+- colores HEX
+- tipografías
+
+4. CONTENIDO
+- 7 días
+- hooks virales
+- guiones técnicos
+
+5. NEGOCIO
+- viabilidad
+- optimización
+
+Sé preciso, directo y accionable.
 """
 
 # ==============================
-# UI
+# INPUTS
 # ==============================
 
-st.subheader("Nuevo análisis")
+urls_input = st.text_area("URLs (una por línea)")
+location = st.text_input("Ubicación", "Quito, Ecuador")
 
-urls = st.text_area("URLs")
-location = st.text_input("Ubicación", "Quito")
+# ==============================
+# TEST GEMINI (DEBUG TOOL)
+# ==============================
 
-if st.button("Analizar"):
+if st.button("TEST GEMINI"):
+    st.write(call_gemini("Responde solo OK"))
 
-    if not urls:
-        st.error("Faltan URLs")
+# ==============================
+# RUN
+# ==============================
+
+if st.button("Ejecutar análisis"):
+
+    if not urls_input.strip():
+        st.error("Debes ingresar URLs")
     else:
 
+        urls = urls_input.split("\n")
+
+        st.write("Procesando scraping...")
+
         data = []
-        for u in urls.split("\n"):
-            if u.strip():
-                data.append(scrape(u.strip()))
+        for u in urls:
+            u = u.strip()
+            if u:
+                data.append(scrape(u))
+
+        st.write("Consultando Gemini...")
 
         prompt = build_prompt(data, location)
 
         result = call_gemini(prompt)
 
-        st.markdown("## Resultado")
+        st.markdown("## Resultado estratégico")
         st.write(result)
 
-        save_analysis(st.session_state.user, urls, result)
+        with st.expander("Datos crudos"):
+            st.json(data)
 
 # ==============================
-# HISTORIAL
+# DEBUG PANEL
 # ==============================
 
-st.subheader("Historial")
-
-history = get_history(st.session_state.user)
-
-for h in history[:10]:
-    st.markdown("---")
-    st.write("Input:", h[0])
-    st.write("Fecha:", h[2])
-    st.write(h[1])
+with st.expander("Debug"):
+    st.write("API KEY cargada:", bool(GEMINI_API_KEY))
